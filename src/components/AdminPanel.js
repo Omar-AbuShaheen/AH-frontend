@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Table, Button, Modal, Form, Badge, Alert, Spinner, Nav, ProgressBar, Dropdown } from 'react-bootstrap';
-import { FaPlus, FaEdit, FaTrash, FaEye, FaBuilding, FaBriefcase, FaFileAlt, FaChartLine, FaUsers, FaCheck, FaTimes, FaClock, FaUserCheck, FaUserTimes, FaChartBar, FaFilter, FaSearch } from 'react-icons/fa';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -17,7 +16,9 @@ function AdminPanel({ user, onNavigate }) {
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showInternshipModal, setShowInternshipModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showCompanyDetailsModal, setShowCompanyDetailsModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [selectedCompany, setSelectedCompany] = useState(null);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,7 +33,8 @@ function AdminPanel({ user, onNavigate }) {
     description: '',
     website: '',
     contact_email: '',
-    contact_phone: ''
+    contact_phone: '',
+    contact_person: ''
   });
   
   const [internshipForm, setInternshipForm] = useState({
@@ -139,17 +141,42 @@ function AdminPanel({ user, onNavigate }) {
     e.preventDefault();
     
     try {
+      const token = localStorage.getItem('token');
       const url = editingItem 
-        ? `${API_BASE_URL}/companies/${editingItem.id}`
-        : `${API_BASE_URL}/companies`;
+        ? `${API_BASE_URL}/admin/companies/${editingItem.id}`
+        : `${API_BASE_URL}/auth/company/register`;
       
       const method = editingItem ? 'PUT' : 'POST';
       
+      // Prepare the data according to the backend API expectations
+      const requestData = editingItem ? {
+        company_name: companyForm.name,
+        contact_person: companyForm.contact_person,
+        industry: companyForm.industry,
+        location: companyForm.location,
+        website: companyForm.website,
+        description: companyForm.description,
+        phone: companyForm.contact_phone,
+        contact_email: companyForm.contact_email
+      } : {
+        company_name: companyForm.name,
+        contact_person: companyForm.contact_person || 'Admin',
+        email: companyForm.contact_email,
+        industry: companyForm.industry,
+        location: companyForm.location,
+        website: companyForm.website,
+        description: companyForm.description,
+        phone: companyForm.contact_phone,
+        password: 'TempPassword123!' // Temporary password for admin-created companies
+      };
+      
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(companyForm)
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
       });
 
       if (response.ok) {
@@ -157,7 +184,7 @@ function AdminPanel({ user, onNavigate }) {
         setEditingItem(null);
         setCompanyForm({
           name: '', industry: '', location: '', description: '', 
-          website: '', contact_email: '', contact_phone: ''
+          website: '', contact_email: '', contact_phone: '', contact_person: ''
         });
         fetchAdminData();
         alert(editingItem ? 'Company updated successfully!' : 'Company created successfully!');
@@ -166,6 +193,7 @@ function AdminPanel({ user, onNavigate }) {
         alert(error.message || 'Operation failed');
       }
     } catch (error) {
+      console.error('Error saving company:', error);
       alert('Error saving company');
     }
   };
@@ -258,26 +286,55 @@ function AdminPanel({ user, onNavigate }) {
   };
 
   const handleDeleteCompany = async (companyId) => {
-    if (!window.confirm('Are you sure you want to delete this company? This action cannot be undone.')) return;
-    
+    if (window.confirm('Are you sure you want to delete this company? This action cannot be undone.')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/companies/${companyId}`, {
+          method: 'DELETE',
+          headers: { 
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          fetchAdminData();
+          alert('Company deleted successfully!');
+        } else {
+          const error = await response.json();
+          alert(error.message || 'Failed to delete company');
+        }
+      } catch (error) {
+        alert('Error deleting company');
+      }
+    }
+  };
+
+  const handleViewCompanyDetails = (company) => {
+    setSelectedCompany(company);
+    setShowCompanyDetailsModal(true);
+  };
+
+  const handleCompanyApproval = async (companyId, isApproved) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/admin/companies/${companyId}`, {
-        method: 'DELETE',
-        headers: {
+      const response = await fetch(`${API_BASE_URL}/admin/companies/${companyId}/approval`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ is_approved: isApproved })
       });
 
       if (response.ok) {
         fetchAdminData();
-        alert('Company deleted successfully!');
+        alert(`Company ${isApproved ? 'approved' : 'rejected'} successfully!`);
       } else {
         const error = await response.json();
-        alert(error.message || 'Delete failed');
+        alert(error.message || 'Failed to update company approval');
       }
     } catch (error) {
-      alert('Error deleting company');
+      alert('Error updating company approval');
     }
   };
 
@@ -445,8 +502,8 @@ function AdminPanel({ user, onNavigate }) {
               </h5>
             </Card.Header>
             <Card.Body>
-              <Row>
-                <Col md={6}>
+      <Row>
+        <Col md={6}>
                   <div className="mb-3">
                     <div className="d-flex justify-content-between mb-1">
                       <span>Applied</span>
@@ -514,7 +571,7 @@ function AdminPanel({ user, onNavigate }) {
                   Review Companies
                 </Button>
               </div>
-              <div>
+                  <div>
                 <h6 className="text-warning">Internship Approvals</h6>
                 <p className="mb-2">{stats.pendingInternships} internships waiting for approval</p>
                 <Button 
@@ -524,7 +581,7 @@ function AdminPanel({ user, onNavigate }) {
                 >
                   Review Internships
                 </Button>
-              </div>
+                  </div>
             </Card.Body>
           </Card>
         </Col>
@@ -543,34 +600,34 @@ function AdminPanel({ user, onNavigate }) {
             <Card.Body>
               <Row>
                 <Col md={3}>
-                  <Button 
+              <Button 
                     variant="outline-primary" 
-                    className="w-100 mb-2"
-                    onClick={() => setShowCompanyModal(true)}
-                  >
+                className="w-100 mb-2"
+                onClick={() => setShowCompanyModal(true)}
+              >
                     <i className="fas fa-building me-2"></i>
-                    Add Company
-                  </Button>
+                Add Company
+              </Button>
                 </Col>
                 <Col md={3}>
-                  <Button 
+              <Button 
                     variant="outline-info" 
-                    className="w-100 mb-2"
-                    onClick={() => setShowInternshipModal(true)}
-                  >
+                className="w-100 mb-2"
+                onClick={() => setShowInternshipModal(true)}
+              >
                     <i className="fas fa-briefcase me-2"></i>
-                    Add Internship
-                  </Button>
+                Add Internship
+              </Button>
                 </Col>
                 <Col md={3}>
-                  <Button 
+              <Button 
                     variant="outline-warning" 
                     className="w-100 mb-2"
                     onClick={() => setActiveTab('companies')}
                   >
                     <i className="fas fa-user-check me-2"></i>
                     Review Companies
-                  </Button>
+              </Button>
                 </Col>
                 <Col md={3}>
                   <Button 
@@ -595,7 +652,7 @@ function AdminPanel({ user, onNavigate }) {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4>Company Management</h4>
         <Button variant="primary" onClick={() => setShowCompanyModal(true)}>
-          <FaPlus className="me-2" />
+          <i className="fas fa-plus me-2"></i>
           Add Company
         </Button>
       </div>
@@ -646,27 +703,27 @@ function AdminPanel({ user, onNavigate }) {
       <Card>
         <Card.Body className="p-0">
           <Table responsive striped hover className="mb-0">
-            <thead>
-              <tr>
+        <thead>
+          <tr>
                 <th>Company Name</th>
-                <th>Industry</th>
-                <th>Location</th>
+            <th>Industry</th>
+            <th>Location</th>
                 <th>Contact Person</th>
                 <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
               {filteredCompanies.map(company => (
-                <tr key={company.id}>
-                  <td>
+            <tr key={company.id}>
+              <td>
                     <strong>{company.company_name || 'Company'}</strong>
-                    <br />
+                <br />
                     <small className="text-muted">{company.email}</small>
-                  </td>
-                  <td>
+              </td>
+              <td>
                     <Badge bg="info">{company.industry || 'N/A'}</Badge>
-                  </td>
+              </td>
                   <td>{company.location || 'N/A'}</td>
                   <td>{company.contact_person || 'N/A'}</td>
                   <td>
@@ -680,7 +737,7 @@ function AdminPanel({ user, onNavigate }) {
                         variant="success" 
                         size="sm" 
                         className="me-2"
-                        onClick={() => handleApproveCompany(company.id, true)}
+                        onClick={() => handleCompanyApproval(company.id, true)}
                       >
                         <i className="fas fa-check me-1"></i>
                         Approve
@@ -691,12 +748,20 @@ function AdminPanel({ user, onNavigate }) {
                         variant="danger" 
                         size="sm" 
                         className="me-2"
-                        onClick={() => handleApproveCompany(company.id, false)}
+                        onClick={() => handleCompanyApproval(company.id, false)}
                       >
                         <i className="fas fa-times me-1"></i>
                         Reject
                       </Button>
                     )}
+                    <Button 
+                      variant="outline-info" 
+                      size="sm" 
+                      className="me-2"
+                      onClick={() => handleViewCompanyDetails(company)}
+                    >
+                      <i className="fas fa-eye"></i>
+                    </Button>
                     <Button 
                       variant="outline-primary" 
                       size="sm" 
@@ -710,25 +775,26 @@ function AdminPanel({ user, onNavigate }) {
                           description: company.description || '',
                           website: company.website || '',
                           contact_email: company.email || '',
-                          contact_phone: company.phone || ''
+                          contact_phone: company.phone || '',
+                          contact_person: company.contact_person || ''
                         });
                         setShowCompanyModal(true);
                       }}
                     >
                       <i className="fas fa-edit"></i>
                     </Button>
-                    <Button 
-                      variant="outline-danger" 
-                      size="sm"
+                <Button 
+                  variant="outline-danger" 
+                  size="sm"
                       onClick={() => handleDeleteCompany(company.id)}
-                    >
+                >
                       <i className="fas fa-trash"></i>
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
           {filteredCompanies.length === 0 && (
             <div className="empty-state">
               <i className="fas fa-search"></i>
@@ -745,7 +811,7 @@ function AdminPanel({ user, onNavigate }) {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4>Internship Management</h4>
         <Button variant="primary" onClick={() => setShowInternshipModal(true)}>
-          <FaPlus className="me-2" />
+          <i className="fas fa-plus me-2"></i>
           Add Internship
         </Button>
       </div>
@@ -851,7 +917,7 @@ function AdminPanel({ user, onNavigate }) {
                         className="me-2"
                         onClick={() => handleApproveInternship(internship.id, true)}
                       >
-                        <FaCheck className="me-1" />
+                        <i className="fas fa-check me-1"></i>
                         Approve
                       </Button>
                     )}
@@ -862,7 +928,7 @@ function AdminPanel({ user, onNavigate }) {
                         className="me-2"
                         onClick={() => handleApproveInternship(internship.id, false)}
                       >
-                        <FaTimes className="me-1" />
+                        <i className="fas fa-times me-1"></i>
                         Reject
                       </Button>
                     )}
@@ -888,14 +954,14 @@ function AdminPanel({ user, onNavigate }) {
                         setShowInternshipModal(true);
                       }}
                 >
-                  <FaEdit />
+                  <i className="fas fa-edit"></i>
                 </Button>
                 <Button 
                   variant="outline-danger" 
                   size="sm"
                       onClick={() => handleDeleteInternship(internship.id)}
                 >
-                  <FaTrash />
+                  <i className="fas fa-trash"></i>
                 </Button>
               </td>
             </tr>
@@ -917,7 +983,7 @@ function AdminPanel({ user, onNavigate }) {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4>Application Management</h4>
         <Button variant="info" onClick={() => setShowStatsModal(true)}>
-          <FaChartBar className="me-2" />
+          <i className="fas fa-chart-bar me-2"></i>
           View Statistics
         </Button>
       </div>
@@ -1058,7 +1124,7 @@ function AdminPanel({ user, onNavigate }) {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4>Student Management</h4>
         <Button variant="info" onClick={() => setShowStatsModal(true)}>
-          <FaChartBar className="me-2" />
+          <i className="fas fa-chart-bar me-2"></i>
           View Statistics
         </Button>
       </div>
@@ -1147,9 +1213,9 @@ function AdminPanel({ user, onNavigate }) {
                       size="sm"
                       onClick={() => handleDeleteStudent(student.id)}
                     >
-                      <FaTimes />
+                      <i className="fas fa-times"></i>
                     </Button>
-                  </td>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -1228,21 +1294,21 @@ function AdminPanel({ user, onNavigate }) {
           <Nav.Item>
             <Nav.Link 
               active={activeTab === 'overview'}
-              onClick={() => setActiveTab('overview')}
+            onClick={() => setActiveTab('overview')}
               className="nav-link-custom"
-            >
+          >
               <i className="fas fa-chart-line me-2"></i>
-              Overview
+            Overview
             </Nav.Link>
           </Nav.Item>
           <Nav.Item>
             <Nav.Link 
               active={activeTab === 'companies'}
-              onClick={() => setActiveTab('companies')}
+            onClick={() => setActiveTab('companies')}
               className="nav-link-custom"
-            >
+          >
               <i className="fas fa-building me-2"></i>
-              Companies
+            Companies
               {stats.pendingCompanies > 0 && (
                 <Badge bg="warning" className="ms-2">
                   {stats.pendingCompanies}
@@ -1253,11 +1319,11 @@ function AdminPanel({ user, onNavigate }) {
           <Nav.Item>
             <Nav.Link 
               active={activeTab === 'internships'}
-              onClick={() => setActiveTab('internships')}
+            onClick={() => setActiveTab('internships')}
               className="nav-link-custom"
-            >
+          >
               <i className="fas fa-briefcase me-2"></i>
-              Internships
+            Internships
               {stats.pendingInternships > 0 && (
                 <Badge bg="warning" className="ms-2">
                   {stats.pendingInternships}
@@ -1268,21 +1334,21 @@ function AdminPanel({ user, onNavigate }) {
           <Nav.Item>
             <Nav.Link 
               active={activeTab === 'applications'}
-              onClick={() => setActiveTab('applications')}
+            onClick={() => setActiveTab('applications')}
               className="nav-link-custom"
-            >
+          >
               <i className="fas fa-file-alt me-2"></i>
-              Applications
+            Applications
             </Nav.Link>
           </Nav.Item>
           <Nav.Item>
             <Nav.Link 
               active={activeTab === 'students'}
-              onClick={() => setActiveTab('students')}
+            onClick={() => setActiveTab('students')}
               className="nav-link-custom"
-            >
+          >
               <i className="fas fa-users me-2"></i>
-              Students
+            Students
             </Nav.Link>
           </Nav.Item>
         </Nav>
@@ -1296,7 +1362,7 @@ function AdminPanel({ user, onNavigate }) {
         setEditingItem(null);
         setCompanyForm({
           name: '', industry: '', location: '', description: '', 
-          website: '', contact_email: '', contact_phone: ''
+          website: '', contact_email: '', contact_phone: '', contact_person: ''
         });
       }}>
         <Modal.Header closeButton>
@@ -1362,6 +1428,18 @@ function AdminPanel({ user, onNavigate }) {
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
+                  <Form.Label>Contact Email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    value={companyForm.contact_email}
+                    onChange={(e) => setCompanyForm({...companyForm, contact_email: e.target.value})}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
                   <Form.Label>Contact Phone</Form.Label>
                   <Form.Control
                     type="tel"
@@ -1369,6 +1447,9 @@ function AdminPanel({ user, onNavigate }) {
                     onChange={(e) => setCompanyForm({...companyForm, contact_phone: e.target.value})}
                   />
                 </Form.Group>
+              </Col>
+              <Col md={6}>
+                {/* Empty column for layout */}
               </Col>
             </Row>
             <Form.Group className="mb-3">
@@ -1555,7 +1636,7 @@ function AdminPanel({ user, onNavigate }) {
       <Modal show={showStatsModal} onHide={() => setShowStatsModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaChartBar className="me-2" />
+            <i className="fas fa-chart-bar me-2"></i>
             Platform Statistics
           </Modal.Title>
         </Modal.Header>
@@ -1632,6 +1713,129 @@ function AdminPanel({ user, onNavigate }) {
           <Button variant="secondary" onClick={() => setShowStatsModal(false)}>
             Close
           </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Company Details Modal */}
+      <Modal show={showCompanyDetailsModal} onHide={() => setShowCompanyDetailsModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="fas fa-building me-2"></i>
+            Company Details
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedCompany && (
+            <div>
+              <Row>
+                <Col md={6}>
+                  <h6 className="text-primary mb-3">Basic Information</h6>
+                  <div className="mb-3">
+                    <strong>Company Name:</strong>
+                    <p className="text-muted mb-1">{selectedCompany.company_name}</p>
+                  </div>
+                  <div className="mb-3">
+                    <strong>Industry:</strong>
+                    <p className="text-muted mb-1">
+                      <Badge bg="info">{selectedCompany.industry || 'N/A'}</Badge>
+                    </p>
+                  </div>
+                  <div className="mb-3">
+                    <strong>Location:</strong>
+                    <p className="text-muted mb-1">{selectedCompany.location || 'N/A'}</p>
+                  </div>
+                  <div className="mb-3">
+                    <strong>Status:</strong>
+                    <p className="mb-1">
+                      <Badge bg={selectedCompany.is_approved ? 'success' : 'warning'}>
+                        {selectedCompany.is_approved ? 'Approved' : 'Pending Approval'}
+                      </Badge>
+                    </p>
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <h6 className="text-primary mb-3">Contact Information</h6>
+                  <div className="mb-3">
+                    <strong>Email:</strong>
+                    <p className="text-muted mb-1">{selectedCompany.email}</p>
+                  </div>
+                  <div className="mb-3">
+                    <strong>Contact Person:</strong>
+                    <p className="text-muted mb-1">{selectedCompany.contact_person || 'N/A'}</p>
+                  </div>
+                  <div className="mb-3">
+                    <strong>Phone:</strong>
+                    <p className="text-muted mb-1">{selectedCompany.phone || 'N/A'}</p>
+                  </div>
+                  <div className="mb-3">
+                    <strong>Website:</strong>
+                    <p className="text-muted mb-1">
+                      {selectedCompany.website ? (
+                        <a href={selectedCompany.website} target="_blank" rel="noopener noreferrer">
+                          {selectedCompany.website}
+                        </a>
+                      ) : 'N/A'}
+                    </p>
+                  </div>
+                </Col>
+              </Row>
+              
+              <hr />
+              
+              <div className="mb-3">
+                <strong>Description:</strong>
+                <p className="text-muted mb-1">
+                  {selectedCompany.description || 'No description provided.'}
+                </p>
+              </div>
+              
+              <div className="mb-3">
+                <strong>Registration Date:</strong>
+                <p className="text-muted mb-1">
+                  {new Date(selectedCompany.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <div className="d-flex justify-content-between w-100">
+            <div>
+              {selectedCompany && (
+                <>
+                  {!selectedCompany.is_approved && (
+                    <Button 
+                      variant="success" 
+                      className="me-2"
+                      onClick={() => {
+                        handleCompanyApproval(selectedCompany.id, true);
+                        setShowCompanyDetailsModal(false);
+                      }}
+                    >
+                      <i className="fas fa-check me-2"></i>
+                      Approve Company
+                    </Button>
+                  )}
+                  {selectedCompany.is_approved && (
+                    <Button 
+                      variant="danger" 
+                      className="me-2"
+                      onClick={() => {
+                        handleCompanyApproval(selectedCompany.id, false);
+                        setShowCompanyDetailsModal(false);
+                      }}
+                    >
+                      <i className="fas fa-times me-2"></i>
+                      Reject Company
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+            <Button variant="secondary" onClick={() => setShowCompanyDetailsModal(false)}>
+              Close
+            </Button>
+          </div>
         </Modal.Footer>
       </Modal>
     </Container>

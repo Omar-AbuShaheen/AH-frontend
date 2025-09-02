@@ -13,7 +13,11 @@ function InternshipsPage({ user, onNavigate }) {
   const [selectedFilters, setSelectedFilters] = useState({
     location: '',
     type: '',
-    company: ''
+    company: '',
+    industry: '',
+    salary: '',
+    duration: '',
+    deadline: ''
   });
 
   useEffect(() => {
@@ -54,7 +58,7 @@ function InternshipsPage({ user, onNavigate }) {
         internship.description.toLowerCase().includes(search.toLowerCase());
       
       const matchesLocation = !filters.location || 
-        internship.location.toLowerCase().includes(filters.location.toLowerCase());
+        internship.location?.toLowerCase().includes(filters.location.toLowerCase());
       
       const matchesType = !filters.type || 
         internship.type === filters.type;
@@ -62,8 +66,73 @@ function InternshipsPage({ user, onNavigate }) {
       const matchesCompany = !filters.company || 
         internship.company_name?.toLowerCase().includes(filters.company.toLowerCase());
       
-      return matchesSearch && matchesLocation && matchesType && matchesCompany;
+      const matchesIndustry = !filters.industry || 
+        internship.industry?.toLowerCase().includes(filters.industry.toLowerCase());
+      
+      const matchesSalary = !filters.salary || 
+        (() => {
+          if (filters.salary === 'Unpaid') return !internship.stipend || internship.stipend.toLowerCase().includes('unpaid');
+          if (filters.salary === '4000+') return internship.stipend && parseInt(internship.stipend.replace(/\D/g, '')) >= 4000;
+          if (filters.salary.includes('-')) {
+            const [min, max] = filters.salary.split('-').map(n => parseInt(n));
+            const stipendNum = internship.stipend ? parseInt(internship.stipend.replace(/\D/g, '')) : 0;
+            return stipendNum >= min && stipendNum <= max;
+          }
+          return true;
+        })();
+      
+      const matchesDuration = !filters.duration || 
+        internship.duration?.toLowerCase().includes(filters.duration.toLowerCase());
+      
+      const matchesDeadline = !filters.deadline || 
+        (() => {
+          if (!internship.deadline) return false;
+          const deadline = new Date(internship.deadline);
+          const today = new Date();
+          
+          switch (filters.deadline) {
+            case 'this-week':
+              const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+              return deadline <= weekFromNow;
+            case 'this-month':
+              const monthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+              return deadline <= monthFromNow;
+            case 'next-month':
+              const nextMonth = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate());
+              return deadline <= nextMonth;
+            case '3-months':
+              const threeMonths = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+              return deadline <= threeMonths;
+            case '6-months':
+              const sixMonths = new Date(today.getTime() + 180 * 24 * 60 * 60 * 1000);
+              return deadline <= sixMonths;
+            default:
+              return true;
+          }
+        })();
+      
+      return matchesSearch && matchesLocation && matchesType && matchesCompany && 
+             matchesIndustry && matchesSalary && matchesDuration && matchesDeadline;
     });
+    
+    // Apply sorting if specified
+    if (filters.sort) {
+      filtered.sort((a, b) => {
+        switch (filters.sort) {
+          case 'deadline':
+            return new Date(a.deadline || 0) - new Date(b.deadline || 0);
+          case 'salary':
+            const aSalary = a.stipend ? parseInt(a.stipend.replace(/\D/g, '')) : 0;
+            const bSalary = b.stipend ? parseInt(b.stipend.replace(/\D/g, '')) : 0;
+            return bSalary - aSalary;
+          case 'company':
+            return (a.company_name || '').localeCompare(b.company_name || '');
+          case 'recent':
+          default:
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        }
+      });
+    }
     
     setFilteredInternships(filtered);
   };
@@ -148,6 +217,7 @@ function InternshipsPage({ user, onNavigate }) {
             onSearch={handleSearch}
             onFilterChange={handleFilterChange}
             filters={selectedFilters}
+            internships={internships} // Pass internships data to SearchFilter
           />
         </div>
 
@@ -216,7 +286,7 @@ function InternshipsPage({ user, onNavigate }) {
                    className="mt-3"
                    onClick={() => {
                      setSearchTerm('');
-                     setSelectedFilters({ location: '', type: '', company: '' });
+                     setSelectedFilters({ location: '', type: '', company: '', industry: '', salary: '', duration: '', deadline: '' });
                      setFilteredInternships(internships);
                    }}
                    style={{

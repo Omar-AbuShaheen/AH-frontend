@@ -8,13 +8,12 @@ const LoginModal = ({ show, onHide, onLogin, onAdminLogin, onCompanyLogin }) => 
     password: ''
   });
   const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(false);
 
   const handleFieldChange = (field, value) => {
     setLoginForm(prev => ({ ...prev, [field]: value }));
     
-    // Clear error when user starts typing
+    // Clear any existing errors when user types
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -22,27 +21,56 @@ const LoginModal = ({ show, onHide, onLogin, onAdminLogin, onCompanyLogin }) => 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!loginForm.email || !loginForm.password) {
+      setErrors({ general: 'Please fill in all fields' });
+      return;
+    }
+    
     setLoading(true);
     
     try {
-      console.log('🚀 Attempting unified login...');
+      setErrors({});
+
       const response = await authAPI.login(loginForm);
-      console.log('📨 Login response:', response);
       
-      if (response.token) {
-        // Call the main login function with the response
-        onLogin(e, response);
+      if (response && response.token && response.user) {
+        // Store token and user in localStorage
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        // Call the main login function with just the user object
+        onLogin(response.user);
+        
+        // Close the modal
+        onHide();
+      } else {
+        // Handle case where response is invalid but no exception was thrown
+        setErrors({ general: 'Invalid email or password. Please try again.' });
       }
     } catch (error) {
-      console.error('❌ Login error:', error);
-      setErrors({ general: error.message || 'Login failed' });
+      // Handle different types of errors with user-friendly messages
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('Invalid credentials') || 
+            error.message.includes('Unauthorized') ||
+            error.message.includes('401')) {
+          errorMessage = 'Invalid email or password. Please check your credentials.';
+        } else if (error.message.includes('Network') || 
+                   error.message.includes('fetch')) {
+          errorMessage = 'Connection error. Please check your internet connection.';
+        } else if (error.message.includes('User not found')) {
+          errorMessage = 'No account found with this email address.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setErrors({ general: errorMessage });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFieldBlur = (field) => {
-    setTouched({ ...touched, [field]: true });
   };
 
   // Check if form has required data
@@ -58,14 +86,14 @@ const LoginModal = ({ show, onHide, onLogin, onAdminLogin, onCompanyLogin }) => 
         borderBottom: 'none',
         borderRadius: '12px 12px 0 0'
       }}>
-                 <Modal.Title style={{
-           fontSize: '1.5rem',
-           fontWeight: '700',
-           color: '#ffffff'
-         }}>
-           <i className="fas fa-sign-in-alt me-2"></i>
-           Login to CareerNest
-         </Modal.Title>
+        <Modal.Title style={{
+          fontSize: '1.5rem',
+          fontWeight: '700',
+          color: '#ffffff'
+        }}>
+          <i className="fas fa-sign-in-alt me-2"></i>
+          Login to CareerNest
+        </Modal.Title>
       </Modal.Header>
       <Modal.Body style={{ padding: '2rem' }}>
         <Form onSubmit={handleSubmit} noValidate>
@@ -95,9 +123,8 @@ const LoginModal = ({ show, onHide, onLogin, onAdminLogin, onCompanyLogin }) => 
               placeholder="Enter your email address"
               value={loginForm.email}
               onChange={(e) => handleFieldChange('email', e.target.value)}
-              onBlur={() => handleFieldBlur('email')}
-              isInvalid={touched.email && !!errors.email}
-              isValid={touched.email && !errors.email}
+              isInvalid={!!errors.email}
+              isValid={!errors.email}
               required
               style={{
                 borderRadius: '8px',
@@ -128,9 +155,8 @@ const LoginModal = ({ show, onHide, onLogin, onAdminLogin, onCompanyLogin }) => 
               placeholder="Enter your password"
               value={loginForm.password || ''}
               onChange={(e) => handleFieldChange('password', e.target.value)}
-              onBlur={() => handleFieldBlur('password')}
-              isInvalid={touched.password && !!errors.password}
-              isValid={touched.password && !errors.password}
+              isInvalid={!!errors.password}
+              isValid={!errors.password}
               required
               style={{
                 borderRadius: '8px',
@@ -163,17 +189,17 @@ const LoginModal = ({ show, onHide, onLogin, onAdminLogin, onCompanyLogin }) => 
               boxShadow: '0 4px 15px rgba(51, 161, 224, 0.3)'
             }}
           >
-                         {loading ? (
-               <>
-                 <i className="fas fa-spinner fa-spin me-2"></i>
-                 Logging in...
-               </>
-             ) : (
-               <>
-                 <i className="fas fa-sign-in-alt me-2"></i>
-                 Login
-               </>
-             )}
+            {loading ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Logging in...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-sign-in-alt me-2"></i>
+                Login
+              </>
+            )}
           </Button>
         </Form>
       </Modal.Body>

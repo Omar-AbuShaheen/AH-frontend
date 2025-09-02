@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Button, Modal, Form, Badge, Alert, Spinner, Nav, Tab, ProgressBar, Dropdown } from 'react-bootstrap';
-import { FaPlus, FaEdit, FaTrash, FaEye, FaBuilding, FaBriefcase, FaFileAlt, FaChartLine, FaUsers, FaUserEdit, FaCheck, FaTimes, FaClock, FaChartBar, FaFilter, FaSearch, FaEyeSlash, FaEye as FaEyeOpen, FaCalendarAlt, FaMapMarkerAlt, FaMoneyBillWave, FaGraduationCap } from 'react-icons/fa';
+import { Container, Row, Col, Card, Table, Button, Modal, Form, Badge, Alert, Spinner, Nav, ProgressBar, Dropdown } from 'react-bootstrap';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -63,11 +62,6 @@ function CompanyDashboard({ user, onNavigate }) {
       });
     }
   }, [user]);
-
-  // Debug modal state
-  useEffect(() => {
-    console.log('Modal state changed:', { showApplicationModal, selectedApplication });
-  }, [showApplicationModal, selectedApplication]);
 
   const fetchCompanyData = async () => {
     try {
@@ -229,7 +223,7 @@ function CompanyDashboard({ user, onNavigate }) {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/applications/company/${applicationId}/status`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -490,7 +484,7 @@ function CompanyDashboard({ user, onNavigate }) {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4>Internship Management</h4>
         <Button variant="primary" onClick={() => setShowInternshipModal(true)}>
-          <FaPlus className="me-2" />
+          <i className="fas fa-plus me-2" />
           Post New Internship
         </Button>
       </div>
@@ -647,7 +641,7 @@ function CompanyDashboard({ user, onNavigate }) {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h4>Application Management</h4>
         <Button variant="info" onClick={() => setShowStatsModal(true)}>
-          <FaChartBar className="me-2" />
+          <i className="fas fa-chart-bar me-2" />
           View Statistics
         </Button>
       </div>
@@ -761,10 +755,8 @@ function CompanyDashboard({ user, onNavigate }) {
                           variant="outline-info" 
                           size="sm"
                           onClick={() => {
-                            console.log('View button clicked for application:', app);
                             setSelectedApplication(app);
                             setShowApplicationModal(true);
-                            console.log('Modal state set to true');
                           }}
                         >
                           <i className="fas fa-eye"></i>
@@ -1048,7 +1040,7 @@ function CompanyDashboard({ user, onNavigate }) {
       <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaUserEdit className="me-2" />
+            <i className="fas fa-user-edit me-2" />
             Edit Company Profile
           </Modal.Title>
         </Modal.Header>
@@ -1152,7 +1144,6 @@ function CompanyDashboard({ user, onNavigate }) {
       <Modal 
         show={showApplicationModal} 
         onHide={() => {
-          console.log('Modal closing');
           setShowApplicationModal(false);
           setSelectedApplication(null);
         }} 
@@ -1160,12 +1151,11 @@ function CompanyDashboard({ user, onNavigate }) {
       >
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaEye className="me-2" />
+            <i className="fas fa-eye me-2" />
             Application Details
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div>Debug: Modal is open, selectedApplication: {selectedApplication ? 'yes' : 'no'}</div>
           {selectedApplication && (
             <div>
               <Row>
@@ -1227,7 +1217,7 @@ function CompanyDashboard({ user, onNavigate }) {
       <Modal show={showStatsModal} onHide={() => setShowStatsModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaChartBar className="me-2" />
+            <i className="fas fa-chart-bar me-2" />
             Company Statistics
           </Modal.Title>
         </Modal.Header>

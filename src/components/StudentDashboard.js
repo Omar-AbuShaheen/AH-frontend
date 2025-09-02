@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Button, Modal, Form, Badge, Alert, Spinner, Nav, Tab, ProgressBar, Dropdown } from 'react-bootstrap';
-import { FaPlus, FaEdit, FaTrash, FaEye, FaBuilding, FaBriefcase, FaFileAlt, FaChartLine, FaUsers, FaUserEdit, FaCheck, FaTimes, FaClock, FaChartBar, FaFilter, FaSearch, FaEyeSlash, FaEye as FaEyeOpen, FaCalendarAlt, FaMapMarkerAlt, FaMoneyBillWave, FaGraduationCap, FaHeart, FaBookmark, FaDownload, FaUpload } from 'react-icons/fa';
+import { Container, Row, Col, Card, Table, Button, Modal, Form, Badge, Alert, Spinner, Nav, ProgressBar, Dropdown } from 'react-bootstrap';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -55,18 +54,13 @@ function StudentDashboard({ user, onNavigate }) {
     }
   }, [user]);
 
-  // Debug modal state
-  useEffect(() => {
-    console.log('Modal state changed:', { showApplicationModal, selectedApplication, selectedInternship });
-  }, [showApplicationModal, selectedApplication, selectedInternship]);
-
   const fetchStudentData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem('token');
-      
+
       // Fetch available internships and student's applications
       const [internshipsRes, applicationsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/internships`, { 
@@ -74,7 +68,7 @@ function StudentDashboard({ user, onNavigate }) {
             'Authorization': `Bearer ${token}`
           }
         }),
-        fetch(`${API_BASE_URL}/applications/student`, { 
+        fetch(`${API_BASE_URL}/applications/my-applications`, { 
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -84,11 +78,15 @@ function StudentDashboard({ user, onNavigate }) {
       if (internshipsRes.ok) {
         const internshipsData = await internshipsRes.json();
         setInternships(internshipsData);
+      } else {
+        console.error('Failed to fetch internships:', internshipsRes.status);
       }
 
       if (applicationsRes.ok) {
         const applicationsData = await applicationsRes.json();
         setApplications(applicationsData);
+      } else {
+        console.error('Failed to fetch applications:', applicationsRes.status);
       }
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -134,6 +132,7 @@ function StudentDashboard({ user, onNavigate }) {
   const handleApply = async (internshipId) => {
     try {
       const token = localStorage.getItem('token');
+      
       const response = await fetch(`${API_BASE_URL}/internships/${internshipId}/apply`, {
         method: 'POST',
         headers: { 
@@ -146,15 +145,49 @@ function StudentDashboard({ user, onNavigate }) {
       });
 
       if (response.ok) {
-        fetchStudentData();
+        const result = await response.json();
+        
+        // Refresh the data to show the new application
+        await fetchStudentData();
+        
+        // Also manually add the new application to the state if needed
+        const internship = internships.find(i => i.id === internshipId);
+        if (internship) {
+          const newApplication = {
+            id: result.id || Date.now(), // Use result ID or fallback
+            internship_id: internshipId,
+            internship_title: internship.title,
+            company_name: internship.company_name,
+            location: internship.location,
+            type: internship.type,
+            status: 'Applied',
+            created_at: new Date().toISOString(),
+            applied_date: new Date().toISOString()
+          };
+          
+          setApplications(prev => [newApplication, ...prev]);
+        }
+        
         alert('Application submitted successfully!');
       } else {
         const error = await response.json();
+        console.error('Application failed:', error);
         alert(error.message || 'Failed to submit application');
       }
     } catch (error) {
+      console.error('Application error:', error);
       alert('Error submitting application');
     }
+  };
+
+  const handleViewInternship = (internship) => {
+    setSelectedInternship(internship);
+    setShowApplicationModal(true);
+  };
+
+  const handleCloseInternshipModal = () => {
+    setShowApplicationModal(false);
+    setSelectedInternship(null);
   };
 
   const handleProfileSubmit = async (e) => {
@@ -224,14 +257,23 @@ function StudentDashboard({ user, onNavigate }) {
     }
   };
 
+  const getLocationIcon = (location) => {
+    return location === 'Remote' ? <i className="fas fa-filter me-2"></i> : <i className="fas fa-search me-2"></i>;
+  };
+
+  const getApplicationStatus = (internshipId) => {
+    const application = applications.find(app => app.internship_id === internshipId);
+    return application ? application.status : null;
+  };
+
   const getTypeColor = (type) => {
-    switch (type?.toLowerCase()) {
-      case 'full-time': return 'success';
-      case 'part-time': return 'info';
-      case 'remote': return 'warning';
-      case 'hybrid': return 'primary';
-      default: return 'secondary';
-    }
+    const colors = {
+      'full-time': 'success',
+      'part-time': 'info',
+      'remote': 'warning',
+      'hybrid': 'primary'
+    };
+    return colors[type] || 'secondary';
   };
 
   // Filter functions
@@ -259,187 +301,120 @@ function StudentDashboard({ user, onNavigate }) {
 
   const renderOverview = () => (
     <div>
-      {/* Enhanced Statistics Cards */}
-      <Row className="mb-4 stats-overview">
+      <Row className="mb-4">
         <Col md={3}>
-          <Card className="text-center h-100 dashboard-stat-card">
-            <Card.Body>
-              <i className="fas fa-file-alt dashboard-stat-icon text-primary mb-3"></i>
-              <h3>{stats.totalApplications}</h3>
-              <p className="text-muted mb-0">Total Applications</p>
+          <Card className="text-center h-100 border-0 shadow-sm" style={{
+            borderRadius: '12px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+          }}>
+            <Card.Body className="p-4">
+              <i className="fas fa-user text-primary mb-3" style={{ fontSize: '2.5rem' }}></i>
+              <h4 className="fw-bold mb-2" style={{ color: '#2c3e50' }}>{applications.length}</h4>
+              <p className="text-muted mb-0 fw-medium">Total Applications</p>
             </Card.Body>
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="text-center h-100 dashboard-stat-card">
-            <Card.Body>
-              <i className="fas fa-briefcase dashboard-stat-icon text-success mb-3"></i>
-              <h3>{stats.availableInternships}</h3>
-              <p className="text-muted mb-0">Available Internships</p>
+          <Card className="text-center h-100 border-0 shadow-sm" style={{
+            borderRadius: '12px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+          }}>
+            <Card.Body className="p-4">
+              <i className="fas fa-briefcase text-success mb-3" style={{ fontSize: '2.5rem' }}></i>
+              <h4 className="fw-bold mb-2" style={{ color: '#2c3e50' }}>{internships.length}</h4>
+              <p className="text-muted mb-0 fw-medium">Available Internships</p>
             </Card.Body>
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="text-center h-100 dashboard-stat-card">
-            <Card.Body>
-              <i className="fas fa-check dashboard-stat-icon text-warning mb-3"></i>
-              <h3>{stats.applicationStats.shortlisted}</h3>
-              <p className="text-muted mb-0">Shortlisted</p>
+          <Card className="text-center h-100 border-0 shadow-sm" style={{
+            borderRadius: '12px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+          }}>
+            <Card.Body className="p-4">
+              <i className="fas fa-file-alt text-warning mb-3" style={{ fontSize: '2.5rem' }}></i>
+              <h4 className="fw-bold mb-2" style={{ color: '#2c3e50' }}>{applications.filter(app => app.status === 'Applied').length}</h4>
+              <p className="text-muted mb-0 fw-medium">Pending Review</p>
             </Card.Body>
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="text-center h-100 dashboard-stat-card">
-            <Card.Body>
-              <i className="fas fa-users dashboard-stat-icon text-info mb-3"></i>
-              <h3>{stats.applicationStats.hired}</h3>
-              <p className="text-muted mb-0">Hired</p>
+          <Card className="text-center h-100 border-0 shadow-sm" style={{
+            borderRadius: '12px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+          }}>
+            <Card.Body className="p-4">
+              <i className="fas fa-chart-line text-info mb-3" style={{ fontSize: '2.5rem' }}></i>
+              <h4 className="fw-bold mb-2" style={{ color: '#2c3e50' }}>{applications.filter(app => app.status === 'Hired').length}</h4>
+              <p className="text-muted mb-0 fw-medium">Hired Positions</p>
             </Card.Body>
           </Card>
         </Col>
       </Row>
 
-      {/* Application Status Chart */}
-      <Row className="mb-4 charts-section">
-        <Col md={8}>
-          <Card>
-            <Card.Header>
-              <h5 className="mb-0">
-                <i className="fas fa-chart-bar me-2"></i>
-                Application Status Distribution
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Row>
-                <Col md={6}>
-                  <div className="mb-3">
-                    <div className="d-flex justify-content-between mb-1">
-                      <span>Applied</span>
-                      <span>{stats.applicationStats.applied}</span>
-                    </div>
-                    <ProgressBar 
-                      variant="primary" 
-                      now={stats.totalApplications > 0 ? (stats.applicationStats.applied / stats.totalApplications) * 100 : 0} 
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <div className="d-flex justify-content-between mb-1">
-                      <span>Shortlisted</span>
-                      <span>{stats.applicationStats.shortlisted}</span>
-                    </div>
-                    <ProgressBar 
-                      variant="warning" 
-                      now={stats.totalApplications > 0 ? (stats.applicationStats.shortlisted / stats.totalApplications) * 100 : 0} 
-                    />
-                  </div>
-                </Col>
-                <Col md={6}>
-                  <div className="mb-3">
-                    <div className="d-flex justify-content-between mb-1">
-                      <span>Hired</span>
-                      <span>{stats.applicationStats.hired}</span>
-                    </div>
-                    <ProgressBar 
-                      variant="success" 
-                      now={stats.totalApplications > 0 ? (stats.applicationStats.hired / stats.totalApplications) * 100 : 0} 
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <div className="d-flex justify-content-between mb-1">
-                      <span>Rejected</span>
-                      <span>{stats.applicationStats.rejected}</span>
-                    </div>
-                    <ProgressBar 
-                      variant="danger" 
-                      now={stats.totalApplications > 0 ? (stats.applicationStats.rejected / stats.totalApplications) * 100 : 0} 
-                    />
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={4}>
-          <Card className="recent-activity-card">
-            <Card.Header>
-              <h5 className="mb-0">
+      <Row>
+        <Col>
+          <Card className="border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+            <Card.Header className="bg-primary text-white" style={{ 
+              borderRadius: '12px 12px 0 0',
+              backgroundColor: '#33A1E0 !important',
+              borderColor: '#33A1E0'
+            }}>
+              <h5 className="mb-0 fw-bold">
                 <i className="fas fa-clock me-2"></i>
                 Recent Applications
               </h5>
             </Card.Header>
-            <Card.Body>
-              {stats.recentApplications.length > 0 ? (
-                stats.recentApplications.map(app => (
-                  <div key={app.id} className="mb-3 p-2 border rounded">
-                    <h6 className="mb-1">{app.internship_title}</h6>
-                    <p className="text-muted mb-1 small">{app.company_name}</p>
-                    <Badge bg={getStatusColor(app.status)}>{app.status}</Badge>
-                  </div>
-                ))
+            <Card.Body className="p-4">
+              {applications.length === 0 ? (
+                <div className="text-center py-4">
+                  <i className="fas fa-inbox" style={{ fontSize: '2rem', color: '#dee2e6' }}></i>
+                  <p className="text-muted mt-3 mb-0">No applications yet. Start applying to internships!</p>
+                </div>
               ) : (
-                <div className="empty-state">
-                  <i className="fas fa-inbox"></i>
-                  <p className="text-muted mb-0">No recent applications</p>
+                <div>
+                  {applications.slice(0, 5).map(application => (
+                    <div key={application.id} className="d-flex justify-content-between align-items-center py-3 border-bottom">
+                      <div>
+                        <h6 className="mb-1 fw-bold" style={{ color: '#2c3e50' }}>{application.title}</h6>
+                        <small className="text-muted d-flex align-items-center">
+                          <i className="fas fa-building me-1" style={{ color: '#33A1E0' }}></i>
+                          {application.company_name}
+                        </small>
+                      </div>
+                      <Badge 
+                        bg={getStatusColor(application.status)}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          borderRadius: '20px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {application.status}
+                      </Badge>
+                    </div>
+                  ))}
+                  {applications.length > 5 && (
+                    <div className="text-center mt-4">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        onClick={() => setActiveTab('applications')}
+                        style={{
+                          borderRadius: '8px',
+                          padding: '0.5rem 1.5rem',
+                          borderColor: '#33A1E0',
+                          color: '#33A1E0'
+                        }}
+                      >
+                        <i className="fas fa-eye me-2"></i>
+                        View All Applications
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Quick Actions */}
-      <Row>
-        <Col>
-          <Card className="quick-actions-card">
-            <Card.Header>
-              <h5 className="mb-0">
-                <i className="fas fa-plus me-2"></i>
-                Quick Actions
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Row>
-                <Col md={3}>
-                  <Button 
-                    variant="outline-primary" 
-                    className="w-100 mb-2"
-                    onClick={() => setActiveTab('internships')}
-                  >
-                    <i className="fas fa-briefcase me-2"></i>
-                    Browse Internships
-                  </Button>
-                </Col>
-                <Col md={3}>
-                  <Button 
-                    variant="outline-info" 
-                    className="w-100 mb-2"
-                    onClick={() => setActiveTab('applications')}
-                  >
-                    <i className="fas fa-file-alt me-2"></i>
-                    My Applications
-                  </Button>
-                </Col>
-                <Col md={3}>
-                  <Button 
-                    variant="outline-warning" 
-                    className="w-100 mb-2"
-                    onClick={() => setShowResumeModal(true)}
-                  >
-                    <i className="fas fa-upload me-2"></i>
-                    Upload Resume
-                  </Button>
-                </Col>
-                <Col md={3}>
-                  <Button 
-                    variant="outline-success" 
-                    className="w-100 mb-2"
-                    onClick={() => setShowProfileModal(true)}
-                  >
-                    <i className="fas fa-user-edit me-2"></i>
-                    Edit Profile
-                  </Button>
-                </Col>
-              </Row>
             </Card.Body>
           </Card>
         </Col>
@@ -450,304 +425,357 @@ function StudentDashboard({ user, onNavigate }) {
   const renderInternships = () => (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4>Available Internships</h4>
-        <Button variant="info" onClick={() => setActiveTab('applications')}>
-          <FaFileAlt className="me-2" />
-          View My Applications
-        </Button>
+        <h5 className="mb-0 fw-bold" style={{ color: '#33A1E0' }}>
+          <i className="fas fa-briefcase me-2"></i>
+          Available Internships ({internships.length})
+        </h5>
+        <div className="d-flex gap-2">
+          <Form.Control
+            type="text"
+            placeholder="Search internships..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="shadow-sm"
+            style={{
+              borderRadius: '8px',
+              border: '2px solid #e9ecef',
+              padding: '0.5rem 1rem',
+              fontSize: '0.9rem'
+            }}
+          />
+          <Form.Select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="shadow-sm"
+            style={{
+              borderRadius: '8px',
+              border: '2px solid #e9ecef',
+              padding: '0.5rem 1rem',
+              fontSize: '0.9rem'
+            }}
+          >
+            <option value="all">All Types</option>
+            <option value="full-time">Full-time</option>
+            <option value="part-time">Part-time</option>
+            <option value="remote">Remote</option>
+            <option value="hybrid">Hybrid</option>
+          </Form.Select>
+          <Form.Select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            className="shadow-sm"
+            style={{
+              borderRadius: '8px',
+              border: '2px solid #e9ecef',
+              padding: '0.5rem 1rem',
+              fontSize: '0.9rem'
+            }}
+          >
+            <option value="all">All Locations</option>
+            <option value="Remote">Remote</option>
+            <option value="New York">New York</option>
+            <option value="Boston">Boston</option>
+            <option value="Austin">Austin</option>
+            <option value="JAM'A STREET">JAM'A STREET</option>
+          </Form.Select>
+        </div>
       </div>
 
-      {/* Enhanced Search and Filter */}
-      <Card className="search-filter-card">
-        <Card.Body>
-          <Row>
-            <Col md={4}>
-              <div className="input-group">
-                <span className="input-group-text">
-                  <i className="fas fa-search"></i>
-                </span>
-                <Form.Control
-                  type="text"
-                  placeholder="Search internships..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </Col>
-            <Col md={2}>
-              <Form.Select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-              >
-                <option value="all">All Types</option>
-                <option value="Full-time">Full-time</option>
-                <option value="Part-time">Part-time</option>
-                <option value="Remote">Remote</option>
-                <option value="Hybrid">Hybrid</option>
-              </Form.Select>
-            </Col>
-            <Col md={2}>
-              <Form.Select
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-              >
-                <option value="all">All Locations</option>
-                {Array.from(new Set(internships.map(i => i.location))).map(location => (
-                  <option key={location} value={location}>{location}</option>
-                ))}
-              </Form.Select>
-            </Col>
-            <Col md={2}>
-              <Form.Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="applied">Applied</option>
-                <option value="not-applied">Not Applied</option>
-              </Form.Select>
-            </Col>
-            <Col md={2}>
-              <Button 
-                variant="outline-secondary" 
-                onClick={() => {
-                  setSearchTerm('');
-                  setTypeFilter('all');
-                  setLocationFilter('all');
-                  setStatusFilter('all');
-                }}
-              >
-                <i className="fas fa-filter me-2"></i>
-                Clear
-              </Button>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-
-      <Card>
-        <Card.Body className="p-0">
-          <Table responsive striped hover className="mb-0">
-            <thead>
-              <tr>
-                <th>Position</th>
-                <th>Company</th>
-                <th>Location</th>
-                <th>Type</th>
-                <th>Deadline</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInternships.map(internship => {
-                const isApplied = applications.some(app => app.internship_id === internship.id);
-                const application = applications.find(app => app.internship_id === internship.id);
-                
-                return (
-                  <tr key={internship.id}>
-                    <td>
-                      <strong>{internship.title}</strong>
-                      <br />
-                      <small className="text-muted">{internship.description?.substring(0, 50)}...</small>
-                    </td>
-                    <td>
-                      <i className="fas fa-building me-1 text-muted"></i>
-                      {internship.company_name || 'N/A'}
-                    </td>
-                    <td>
-                      <i className="fas fa-map-marker-alt me-1 text-muted"></i>
-                      {internship.location || 'N/A'}
-                    </td>
-                    <td>
-                      <Badge bg={getTypeColor(internship.type)}>{internship.type || 'N/A'}</Badge>
-                    </td>
-                    <td>
-                      <i className="fas fa-calendar-alt me-1 text-muted"></i>
-                      {internship.deadline ? new Date(internship.deadline).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td>
-                      {isApplied ? (
-                        <Badge bg={getStatusColor(application?.status)}>
-                          {application?.status || 'Applied'}
-                        </Badge>
-                      ) : (
-                        <Badge bg="secondary">Not Applied</Badge>
-                      )}
-                    </td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button 
-                          variant="outline-info" 
-                          size="sm"
-                          onClick={() => {
-                            console.log('View button clicked for internship:', internship);
-                            setSelectedInternship(internship);
-                            setSelectedApplication(null);
-                            setShowApplicationModal(true);
-                            console.log('Modal state set to true');
+      {internships.length === 0 ? (
+        <div className="text-center py-5">
+          <i className="fas fa-search" style={{ fontSize: '3rem', color: '#dee2e6' }}></i>
+          <p className="text-muted mt-3">No internships found matching your criteria.</p>
+        </div>
+      ) : (
+        <Row>
+          {internships.map(internship => (
+            <Col key={internship.id} lg={6} xl={4} className="mb-4">
+              <Card className="h-100 border-0 shadow-sm" style={{
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                borderRadius: '12px'
+              }}>
+                <Card.Body className="p-4">
+                  {/* Header with title and type badge */}
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <h6 className="card-title mb-0 fw-bold" style={{ 
+                      color: '#2c3e50',
+                      fontSize: '1.1rem',
+                      lineHeight: '1.3'
+                    }}>
+                      {internship.title}
+                    </h6>
+                    <Badge 
+                      bg={getTypeColor(internship.type)} 
+                      className="ms-2 px-3 py-2"
+                      style={{ 
+                        fontSize: '0.75rem',
+                        borderRadius: '20px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      {internship.type?.toUpperCase()}
+                    </Badge>
+                  </div>
+                  
+                  {/* Company info */}
+                  <div className="company-info mb-3">
+                    <h6 className="text-muted mb-0 d-flex align-items-center" style={{ fontSize: '0.9rem' }}>
+                      <i className="fas fa-building me-2" style={{ color: '#33A1E0' }}></i>
+                      {internship.company_name || 'Company Name'}
+                    </h6>
+                  </div>
+                  
+                  {/* Description */}
+                  <p className="card-text text-muted mb-3" style={{ 
+                    fontSize: '0.9rem',
+                    lineHeight: '1.5',
+                    minHeight: '3rem'
+                  }}>
+                    {internship.description && internship.description.length > 80 
+                      ? `${internship.description.substring(0, 80)}...`
+                      : internship.description || 'No description available'
+                    }
+                  </p>
+                  
+                  {/* Details badges */}
+                  <div className="internship-details mb-4">
+                    <div className="d-flex flex-wrap gap-2 mb-2">
+                      <Badge 
+                        bg="light" 
+                        className="text-dark border"
+                        style={{ 
+                          fontSize: '0.75rem',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '20px'
+                        }}
+                      >
+                        <i className="fas fa-map-marker-alt me-1" style={{ color: '#33A1E0' }}></i>
+                        {internship.location}
+                      </Badge>
+                      <Badge 
+                        bg="warning" 
+                        className="text-dark"
+                        style={{ 
+                          fontSize: '0.75rem',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '20px'
+                        }}
+                      >
+                        <i className="fas fa-clock me-1"></i>
+                        {internship.duration || '3-6 months'}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Footer with deadline and actions */}
+                  <div className="mt-auto">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.8rem' }}>
+                        <i className="fas fa-calendar-alt me-1" style={{ color: '#33A1E0' }}></i>
+                        Deadline: {new Date(internship.deadline).toLocaleDateString()}
+                      </small>
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div className="d-flex gap-2 flex-wrap">
+                      <Button 
+                        variant="outline-secondary" 
+                        size="sm"
+                        onClick={() => handleViewInternship(internship)}
+                        className="flex-fill"
+                        style={{
+                          borderRadius: '8px',
+                          fontSize: '0.85rem',
+                          padding: '0.5rem 1rem',
+                          borderWidth: '2px'
+                        }}
+                      >
+                        <i className="fas fa-eye me-1"></i>
+                        View
+                      </Button>
+                      
+                      {getApplicationStatus(internship.id) ? (
+                        <Badge 
+                          bg="info" 
+                          className="flex-fill d-flex align-items-center justify-content-center"
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '8px',
+                            fontSize: '0.85rem'
                           }}
                         >
-                          <i className="fas fa-eye"></i>
-                        </Button>
-                        {!isApplied && (
-                          <Button 
-                            variant="outline-success" 
-                            size="sm"
-                            onClick={() => handleApply(internship.id)}
-                          >
-                            Apply
-                          </Button>
-                        )}
+                          <i className="fas fa-check me-1"></i>
+                          Applied
+                        </Badge>
+                      ) : (
                         <Button 
-                          variant="outline-warning" 
+                          variant="primary" 
                           size="sm"
+                          onClick={() => handleApply(internship.id)}
+                          className="flex-fill"
+                          style={{
+                            borderRadius: '8px',
+                            fontSize: '0.85rem',
+                            padding: '0.5rem 1rem',
+                            backgroundColor: '#33A1E0',
+                            borderColor: '#33A1E0'
+                          }}
                         >
-                          <i className="fas fa-heart"></i>
+                          <i className="fas fa-paper-plane me-1"></i>
+                          Apply
                         </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-          {filteredInternships.length === 0 && (
-            <div className="empty-state">
-              <i className="fas fa-search"></i>
-              <p className="text-muted">No internships found matching your criteria.</p>
-            </div>
-          )}
-        </Card.Body>
-      </Card>
+                      )}
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
     </div>
   );
 
   const renderApplications = () => (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h4>My Applications</h4>
-        <Button variant="info" onClick={() => setActiveTab('internships')}>
-          <FaBriefcase className="me-2" />
-          Browse More Internships
+        <h5 className="mb-0 fw-bold" style={{ color: '#33A1E0' }}>
+          <i className="fas fa-file-alt me-2"></i>
+          My Applications ({applications.length})
+        </h5>
+        <Button 
+          variant="outline-primary" 
+          size="sm"
+          onClick={fetchStudentData}
+          style={{
+            borderRadius: '8px',
+            padding: '0.5rem 1rem',
+            borderColor: '#33A1E0',
+            color: '#33A1E0'
+          }}
+        >
+          <i className="fas fa-sync-alt me-2"></i>
+          Refresh
         </Button>
       </div>
-
-      {/* Enhanced Search and Filter */}
-      <Card className="search-filter-card">
-        <Card.Body>
-          <Row>
-            <Col md={6}>
-              <div className="input-group">
-                <span className="input-group-text">
-                  <i className="fas fa-search"></i>
-                </span>
-                <Form.Control
-                  type="text"
-                  placeholder="Search applications..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </Col>
-            <Col md={3}>
-              <Form.Select
-                value={applicationStatusFilter}
-                onChange={(e) => setApplicationStatusFilter(e.target.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="Applied">Applied</option>
-                <option value="Shortlisted">Shortlisted</option>
-                <option value="Hired">Hired</option>
-                <option value="Rejected">Rejected</option>
-                <option value="Withdrawn">Withdrawn</option>
-              </Form.Select>
-            </Col>
-            <Col md={3}>
-              <Button 
-                variant="outline-secondary" 
-                onClick={() => {
-                  setSearchTerm('');
-                  setApplicationStatusFilter('all');
-                }}
-              >
-                <i className="fas fa-filter me-2"></i>
-                Clear Filters
-              </Button>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-
-      <Card>
-        <Card.Body className="p-0">
-          <Table responsive striped hover className="mb-0">
-            <thead>
-              <tr>
-                <th>Position</th>
-                <th>Company</th>
-                <th>Applied Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredApplications.map(app => (
-                <tr key={app.id}>
-                  <td>
-                    <strong>{app.internship_title}</strong>
-                    <br />
-                    <small className="text-muted">
-                      <i className="fas fa-map-marker-alt me-1"></i>
-                      {app.location || 'N/A'}
-                    </small>
-                  </td>
-                  <td>
-                    <i className="fas fa-building me-1 text-muted"></i>
-                    {app.company_name || 'N/A'}
-                  </td>
-                  <td>
-                    <i className="fas fa-calendar-alt me-1 text-muted"></i>
-                    {app.applied_date ? new Date(app.applied_date).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td>
-                    <Badge bg={getStatusColor(app.status)}>{app.status}</Badge>
-                  </td>
-                  <td>
-                    <div className="d-flex gap-2">
-                      <Button 
-                        variant="outline-info" 
-                        size="sm"
-                        onClick={() => {
-                          console.log('View button clicked for application:', app);
-                          setSelectedApplication(app);
-                          setSelectedInternship(null);
-                          setShowApplicationModal(true);
-                          console.log('Modal state set to true');
+      
+      {applications.length === 0 ? (
+        <div className="text-center py-5">
+          <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#dee2e6' }}></i>
+          <p className="text-muted mt-3">You haven't applied to any internships yet.</p>
+          <div className="mt-3">
+            <Button 
+              variant="primary"
+              onClick={() => setActiveTab('internships')}
+              className="me-2"
+              style={{
+                borderRadius: '8px',
+                padding: '0.75rem 2rem',
+                backgroundColor: '#33A1E0',
+                borderColor: '#33A1E0'
+              }}
+            >
+              <i className="fas fa-search me-2"></i>
+              Browse Internships
+            </Button>
+            <Button 
+              variant="outline-secondary"
+              onClick={fetchStudentData}
+              style={{
+                borderRadius: '8px',
+                padding: '0.75rem 2rem'
+              }}
+            >
+              <i className="fas fa-sync-alt me-2"></i>
+              Check for Applications
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {applications.map(application => (
+            <Card key={application.id} className="mb-3 border-0 shadow-sm" style={{
+              borderRadius: '12px',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+            }}>
+              <Card.Body className="p-4">
+                <div className="d-flex justify-content-between align-items-start">
+                  <div className="flex-grow-1">
+                    <h6 className="mb-2 fw-bold" style={{ color: '#2c3e50' }}>{application.title}</h6>
+                    <p className="text-muted mb-3 d-flex align-items-center" style={{ fontSize: '0.9rem' }}>
+                      <i className="fas fa-building me-2" style={{ color: '#33A1E0' }}></i>
+                      {application.company_name}
+                    </p>
+                    <div className="d-flex gap-2 mb-3 flex-wrap">
+                      <Badge 
+                        bg="light" 
+                        className="text-dark border"
+                        style={{ 
+                          fontSize: '0.75rem',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '20px'
                         }}
                       >
-                        <i className="fas fa-eye"></i>
-                      </Button>
-                      <Button 
-                        variant="outline-warning" 
-                        size="sm"
+                        <i className="fas fa-map-marker-alt me-1" style={{ color: '#33A1E0' }}></i>
+                        {application.location}
+                      </Badge>
+                      <Badge 
+                        bg={getTypeColor(application.type)}
+                        style={{ 
+                          fontSize: '0.75rem',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '20px'
+                        }}
                       >
-                        <i className="fas fa-download"></i>
-                      </Button>
+                        {application.type}
+                      </Badge>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-          {filteredApplications.length === 0 && (
-            <div className="empty-state">
-              <i className="fas fa-search"></i>
-              <p className="text-muted">No applications found matching your criteria.</p>
-            </div>
-          )}
-        </Card.Body>
-      </Card>
+                    <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.8rem' }}>
+                      <i className="fas fa-calendar me-1" style={{ color: '#33A1E0' }}></i>
+                      Applied on: {new Date(application.created_at).toLocaleDateString()}
+                    </small>
+                  </div>
+                  <div className="text-end ms-3">
+                    <Badge 
+                      bg={getStatusColor(application.status)} 
+                      className="mb-3 d-block"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600'
+                      }}
+                    >
+                      {application.status}
+                    </Badge>
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm"
+                      onClick={() => {
+                        const internship = internships.find(i => i.id === application.internship_id);
+                        if (internship) {
+                          handleViewInternship(internship);
+                        }
+                      }}
+                      style={{
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        padding: '0.5rem 1rem',
+                        borderWidth: '2px',
+                        borderColor: '#33A1E0',
+                        color: '#33A1E0'
+                      }}
+                    >
+                      <i className="fas fa-eye me-1"></i>
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -857,7 +885,7 @@ function StudentDashboard({ user, onNavigate }) {
       <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaUserEdit className="me-2" />
+            <i className="fas fa-user-edit me-2"></i>
             Edit Student Profile
           </Modal.Title>
         </Modal.Header>
@@ -968,7 +996,6 @@ function StudentDashboard({ user, onNavigate }) {
       <Modal 
         show={showApplicationModal} 
         onHide={() => {
-          console.log('Modal closing');
           setShowApplicationModal(false);
           setSelectedApplication(null);
           setSelectedInternship(null);
@@ -977,12 +1004,11 @@ function StudentDashboard({ user, onNavigate }) {
       >
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaEye className="me-2" />
+            <i className="fas fa-eye me-2"></i>
             {selectedApplication ? 'Application Details' : 'Internship Details'}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div>Debug: Modal is open, selectedApplication: {selectedApplication ? 'yes' : 'no'}, selectedInternship: {selectedInternship ? 'yes' : 'no'}</div>
           {selectedApplication ? (
             <div>
               <Row>
@@ -1033,7 +1059,7 @@ function StudentDashboard({ user, onNavigate }) {
                 <Col md={8}>
                   <h4>{selectedInternship.title}</h4>
                   <p className="text-muted mb-3">
-                    <FaBuilding className="me-2" />
+                    <i className="fas fa-building me-2"></i>
                     {selectedInternship.company_name}
                   </p>
                 </Col>
@@ -1043,7 +1069,7 @@ function StudentDashboard({ user, onNavigate }) {
                   </Badge>
                   <br />
                   <Badge bg="secondary">
-                    <FaMapMarkerAlt className="me-1" />
+                    <i className="fas fa-map-marker-alt me-1"></i>
                     {selectedInternship.location}
                   </Badge>
                 </Col>
@@ -1103,7 +1129,7 @@ function StudentDashboard({ user, onNavigate }) {
                         setShowApplicationModal(false);
                       }}
                     >
-                      <FaFileAlt className="me-2" />
+                      <i className="fas fa-file-alt me-2"></i>
                       Apply Now
                     </Button>
                   )}
@@ -1123,7 +1149,7 @@ function StudentDashboard({ user, onNavigate }) {
       <Modal show={showResumeModal} onHide={() => setShowResumeModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>
-            <FaUpload className="me-2" />
+            <i className="fas fa-upload me-2"></i>
             Upload Resume
           </Modal.Title>
         </Modal.Header>

@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
 
-const SearchFilter = ({ onSearch, onFilter }) => {
+const SearchFilter = ({ onSearch, onFilterChange, filters = {}, internships = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
-    location: '',
-    type: '',
-    company: '',
-    industry: ''
-  });
+
+  // Extract unique values from internships for dynamic filter options
+  const getUniqueValues = (field) => {
+    const values = internships
+      .map(internship => internship[field])
+      .filter(value => value && value.trim() !== '')
+      .sort();
+    return [...new Set(values)];
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -17,19 +20,21 @@ const SearchFilter = ({ onSearch, onFilter }) => {
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    onFilter(newFilters);
+    onFilterChange(newFilters);
   };
 
   const clearFilters = () => {
-    setFilters({
+    const emptyFilters = {
       location: '',
       type: '',
       company: '',
-      industry: ''
-    });
+      industry: '',
+      salary: '',
+      duration: '',
+      deadline: ''
+    };
     setSearchTerm('');
-    onFilter({});
+    onFilterChange(emptyFilters);
     onSearch('');
   };
 
@@ -107,7 +112,7 @@ const SearchFilter = ({ onSearch, onFilter }) => {
         </InputGroup>
       </Form>
 
-      {/* Filters */}
+      {/* Enhanced Filters */}
       <Row className="g-3">
         <Col md={3} sm={6}>
           <Form.Group>
@@ -131,11 +136,17 @@ const SearchFilter = ({ onSearch, onFilter }) => {
               }}
             >
               <option value="">All Locations</option>
-              <option value="Remote"><i className="fas fa-home me-1"></i>Remote</option>
-              <option value="New York"><i className="fas fa-city me-1"></i>New York</option>
-              <option value="Los Angeles"><i className="fas fa-city me-1"></i>Los Angeles</option>
-              <option value="San Francisco"><i className="fas fa-city me-1"></i>San Francisco</option>
-              <option value="Chicago"><i className="fas fa-city me-1"></i>Chicago</option>
+              <option value="Remote">Remote</option>
+              <option value="New York">New York</option>
+              <option value="Los Angeles">Los Angeles</option>
+              <option value="San Francisco">San Francisco</option>
+              <option value="Chicago">Chicago</option>
+              <option value="Boston">Boston</option>
+              <option value="Seattle">Seattle</option>
+              <option value="Austin">Austin</option>
+              <option value="Denver">Denver</option>
+              <option value="Miami">Miami</option>
+              <option value="Atlanta">Atlanta</option>
             </Form.Select>
           </Form.Group>
         </Col>
@@ -162,10 +173,10 @@ const SearchFilter = ({ onSearch, onFilter }) => {
               }}
             >
               <option value="">All Types</option>
-                              <option value="Full-time"><i className="fas fa-briefcase me-1"></i>Full-time</option>
-                              <option value="Part-time"><i className="fas fa-clock me-1"></i>Part-time</option>
-                <option value="Remote"><i className="fas fa-home me-1"></i>Remote</option>
-                              <option value="Hybrid"><i className="fas fa-sync-alt me-1"></i>Hybrid</option>
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
+              <option value="Remote">Remote</option>
+              <option value="Hybrid">Hybrid</option>
             </Form.Select>
           </Form.Group>
         </Col>
@@ -192,40 +203,9 @@ const SearchFilter = ({ onSearch, onFilter }) => {
               }}
             >
               <option value="">All Companies</option>
-              <option value="TechBridge Solutions">TechBridge Solutions</option>
-              <option value="DataCorp Analytics">DataCorp Analytics</option>
-              <option value="Growth Marketing Co">Growth Marketing Co</option>
-            </Form.Select>
-          </Form.Group>
-        </Col>
-        
-        <Col md={3} sm={6}>
-          <Form.Group>
-            <Form.Label className="small fw-medium mb-2" style={{
-              color: '#33A1E0',
-              fontWeight: '600',
-              fontSize: '0.9rem'
-            }}>
-              <i className="fas fa-industry me-1"></i>Industry
-            </Form.Label>
-            <Form.Select
-              size="sm"
-              value={filters.industry}
-              onChange={(e) => handleFilterChange('industry', e.target.value)}
-              className="shadow-sm"
-              style={{
-                borderRadius: '8px',
-                border: '2px solid #e9ecef',
-                padding: '0.75rem 1rem',
-                fontSize: '0.95rem'
-              }}
-            >
-              <option value="">All Industries</option>
-              <option value="Technology"><i className="fas fa-laptop-code me-1"></i>Technology</option>
-              <option value="Data Science"><i className="fas fa-chart-bar me-1"></i>Data Science</option>
-              <option value="Marketing"><i className="fas fa-bullhorn me-1"></i>Marketing</option>
-              <option value="Finance"><i className="fas fa-dollar-sign me-1"></i>Finance</option>
-              <option value="Healthcare"><i className="fas fa-heartbeat me-1"></i>Healthcare</option>
+              {getUniqueValues('company_name').map(company => (
+                <option key={company} value={company}>{company}</option>
+              ))}
             </Form.Select>
           </Form.Group>
         </Col>
@@ -253,11 +233,6 @@ const SearchFilter = ({ onSearch, onFilter }) => {
             {filters.company && (
               <span className="badge bg-success">
                 Company: {filters.company} ✕
-              </span>
-            )}
-            {filters.industry && (
-              <span className="badge bg-secondary">
-                Industry: {filters.industry} ✕
               </span>
             )}
           </div>

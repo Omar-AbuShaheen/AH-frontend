@@ -2,19 +2,22 @@
 
 This folder contains static assets for the CareerNest application.
 
-## Background Image
+## Background Images
 
-To use the professional meeting photo as the hero background:
-
-1. Save the image as `photo-partenaires.png` in this folder
-2. The image should be high resolution (recommended: 1920x1080 or larger)
-3. The CSS is already configured to use this image as the hero section background
+- `bg.png` - Main hero section background image (15MB)
+- `photo-partenaires.png` - Alternative background image (890KB)
 
 ## Current Files
 
 - `index.html` - Main HTML file
-- `favicon.ico` - Site favicon
-- `logo192.png` - App logo (192px)
-- `logo512.png` - App logo (512px)
-- `manifest.json` - PWA manifest
-- `robots.txt` - Search engine configuration
+- `bg.png` - Hero section background image
+- `photo-partenaires.png` - Alternative background image
+
+## Usage
+
+The background images are used in the hero sections of various pages:
+- Home page hero section
+- Internships page hero section  
+- About Us page hero section
+
+The CSS automatically handles the background positioning and overlay effects.
