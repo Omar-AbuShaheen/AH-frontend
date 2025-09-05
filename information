@@ -81,14 +81,14 @@ INSERT INTO internships (company_id, title, description, requirements, responsib
 -- Insert Sample Applications
 INSERT INTO applications (student_id, internship_id, status, cover_letter) VALUES
 (4, 2, 'Applied', 'I am very interested in the Frontend Developer position at Zain Jordan. My experience with React and passion for creating user-friendly interfaces make me a great fit for developing telecom applications.'),
-(5, 4, 'Under Review', 'The Fintech Developer internship at Arab Bank Technology aligns perfectly with my software engineering background and interest in financial technology. I am eager to contribute to innovative banking solutions.'),
+(5, 4, 'Shortlisted', 'The Fintech Developer internship at Arab Bank Technology aligns perfectly with my software engineering background and interest in financial technology. I am eager to contribute to innovative banking solutions.'),
 (6, 6, 'Applied', 'As an IT student with PHP and full-stack experience, I am excited about the Full Stack Developer internship at Petra Technology. I look forward to working on enterprise solutions.'),
-(7, 5, 'Under Review', 'I am passionate about mobile development and would love to join Umniah Digital as a Mobile App Developer intern. My React Native skills would be valuable for telecom mobile applications.'),
+(7, 5, 'Shortlisted', 'I am passionate about mobile development and would love to join Umniah Digital as a Mobile App Developer intern. My React Native skills would be valuable for telecom mobile applications.'),
 (8, 10, 'Applied', 'The Data Analyst internship at Arab Bank Technology is perfect for my skills in Python and data analysis. I am excited to work with financial data and contribute to business intelligence.'),
 (9, 3, 'Applied', 'With my background in computer graphics and creative skills, I believe I would be an excellent fit for the Media Production internship at Roya Media Group.'),
-(10, 7, 'Under Review', 'I am very interested in the Digital Marketing internship at Amman Digital Agency. My creativity and understanding of social media make me a strong candidate for this role.'),
+(10, 7, 'Shortlisted', 'I am very interested in the Digital Marketing internship at Amman Digital Agency. My creativity and understanding of social media make me a strong candidate for this role.'),
 (11, 5, 'Applied', 'As a software engineering student with mobile development experience, I am excited about the opportunity to work on mobile applications at Umniah Digital.'),
-(12, 8, 'Under Review', 'The Backend Developer internship at Zain Jordan is perfect for my skills in Node.js and database management. I am eager to work on telecom server-side applications.'),
+(12, 8, 'Shortlisted', 'The Backend Developer internship at Zain Jordan is perfect for my skills in Node.js and database management. I am eager to work on telecom server-side applications.'),
 (13, 6, 'Applied', 'I am passionate about full-stack development and would love to join Petra Technology Solutions. My experience with modern JavaScript frameworks makes me a great fit.');
 
 -- Display completion message
